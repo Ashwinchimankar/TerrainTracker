@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Home|TerrainTracker</title>
+
+    <!--my CSS-->
+    <!--My bootstrap CSS-->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+      crossorigin="anonymous"
+    />
+    <!--My leaflet CSS-->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <!--My custom css-->
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      #map {
+        width: 100%;
+        height: 100vh;
+      }
+
+      .coordinate {
+        position: absolute;
+        bottom: 10px;
+        right: 50%;
+      }
+
+      .leaflet-popup-content-wrapper {
+        background-color: #000000;
+        color: #fff;
+        border: 1px solid red;
+        border-radius: 0px;
+      }
+      .coordinate-container {
+        position: fixed;
+        bottom: 50px;
+        right: 10px;
+        background-color: #fff;
+        padding: 10px;
+        border: 1px solid #ccc;
+        display: flex;
+        flex-direction: column;
+        border-radius: 5px;
+        z-index: 1000; /* Ensure it's above other elements */
+      }
+
+      .text-box-container {
+        bottom: 30px;
+        right: 10px;
+        background-color: #fff;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        z-index: 1000; /* Ensure it's above other elements */
+      }
+
+      .text-box {
+        display: block;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+
+  <!-- body start -->
+  <body>
+    <nav class="navbar navbar-light bg-light justify-content-between">
+      <a class="navbar-brand" href="./index.html">
+        <img
+          src="./Images/1520.png"
+          alt="Logo"
+          width="50"
+          height="40"
+          class="d-inline-block align-text-top"
+        />
+        TerrainTracker
+      </a>
+      <!--image overlay uplaod  buttons -->
+      <input type="file" id="fileInput" accept="image/*" />
+      <button onclick="loadImageOverlay()">Get latlong</button>
+      <div id="coordinates-container"></div>
+    </nav>
+
+    <!-- map start -->
+    <div id="map">
+      <div class="leaflet-control coordinate"></div>
+    </div>
+  </body>
+</html>
+
+<!-- image overlay link here -->
+<script src="https://unpkg.com/exif-js"></script>
+
+<!--my Script-->
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
+<script src="https://unpkg.com/togeojson@0.16.0"></script>
+<script src="https://unpkg.com/leaflet-filelayer@1.2.0"></script>
+<!-- Include leaflet-control-geocoder -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
+/>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+<!-- Area measuer script start here  ============---------===============-->
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.min.js"></script>
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.min.css"
+/>
+
+<!-- Script start -->
+<script>
+  // map view set
+  var map = L.map("map").setView([20.5937, 78.9629], 5);
+
+  // image overlay function start here
+  var imageOverlay;
+
+  function loadImageOverlay() {
+    var fileInput = document.getElementById("fileInput");
+    var file = fileInput.files[0];
+
+    if (file) {
+      var imageUrl = URL.createObjectURL(file);
+
+      // Use exif-js to read EXIF data from the image
+      EXIF.getData(file, function () {
+        var lat = EXIF.getTag(this, "GPSLatitude");
+        var lon = EXIF.getTag(this, "GPSLongitude");
+
+        if (lat && lon) {
+          var latRef = EXIF.getTag(this, "GPSLatitudeRef") || "N";
+          var lonRef = EXIF.getTag(this, "GPSLongitudeRef") || "E";
+
+          lat =
+            (latRef === "S" ? -1 : 1) * (lat[0] + lat[1] / 60 + lat[2] / 3600);
+          lon =
+            (lonRef === "W" ? -1 : 1) * (lon[0] + lon[1] / 60 + lon[2] / 3600);
+
+          var imageBounds = [
+            [lat - 0.001, lon - 0.001],
+            [lat + 0.001, lon + 0.001],
+          ];
+
+          // Set the map view to the image bounds
+          map.fitBounds(imageBounds);
+
+          // Remove existing overlay if any
+          if (imageOverlay && map.hasLayer(imageOverlay)) {
+            map.removeLayer(imageOverlay);
+          }
+
+          // Add new overlay
+          imageOverlay = L.imageOverlay(imageUrl, imageBounds, {
+            opacity: 0.6,
+          }).addTo(map);
+
+          // Display coordinates in the container
+          document.getElementById(
+            "coordinates-container"
+          ).innerHTML =  `Image Coordinates: ${lat.toFixed(6)}, ${lon.toFixed(
+            6
+          )}` ;
+        } else {
+          alert("Image does not contain GPS coordinates.");
+        }
+      });
+    } else {
+      alert("Please select an image file.");
+    }
+  }
+
+  // map layers adding
+
+  var osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  });
+  osm.addTo(map);
+
+  var OpenStreetMap_France = L.tileLayer(
+    "https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
+    {
+      maxZoom: 23,
+      attribution:
+        '&copy; OpenStreetMap France | &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }
+  );
+  // OpenStreetMap_France.addTo(map);
+
+  googleStreets = L.tileLayer(
+    "http://{s}.google.com/vt?lyrs=m&x={x}&y={y}&z={z}",
+    {
+      maxZoom: 23,
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    }
+  );
+
+  //googleStreets.addTo(map);
+
+  googleHybrid = L.tileLayer(
+    "http://{s}.google.com/vt?lyrs=s,h&x={x}&y={y}&z={z}",
+    {
+      maxZoom: 23,
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    }
+  );
+
+  //googleHybrid.addTo(map);
+
+  googleTerrain = L.tileLayer(
+    "http://{s}.google.com/vt?lyrs=p&x={x}&y={y}&z={z}",
+    {
+      maxZoom: 23,
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    }
+  );
+  //googleTerrain.addTo(map);
+
+  googleSat = L.tileLayer("http://{s}.google.com/vt?lyrs=s&x={x}&y={y}&z={z}", {
+    maxZoom: 23,
+    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+  });
+  //googleSat.addTo(map);
+
+  var OpenTopoMap = L.tileLayer(
+    "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom: 23,
+      attribution:
+        'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
+    }
+  );
+
+  // OpenTopoMap.addTo(map);
+
+  
+
+  //Marker Adding /*****************/
+
+  var myIcon = L.icon({
+    iconUrl: "./images/red_marker.png",
+    iconSize: [40, 40],
+  });
+  var singleMarker = L.marker([20.5937, 78.9629], {
+    icon: myIcon,
+    draggable: false,
+  });
+  var popup = singleMarker
+    .bindPopup("this is india . " + singleMarker.getLatLng())
+    .openPopup();
+  popup.addTo(map);
+
+  var secondMarker = L.marker([9.9422, 78.7024], {
+    icon: myIcon,
+    draggable: true,
+  });
+
+  console.log(singleMarker.toGeoJSON());
+
+  //Get current latlong /**************/
+
+  // Container for displaying coordinates with the remark textbox
+  document.addEventListener("DOMContentLoaded", function () {
+    // Container for displaying coordinates
+    var coordinateContainer = document.createElement("div");
+    coordinateContainer.className = "coordinate-container";
+    document.body.appendChild(coordinateContainer);
+
+    // Add a marker with a popup
+    var marker = L.marker([0, 0]).addTo(map);
+
+    // Function to create text box container
+    function createTextBoxContainer() {
+      // Create container for text boxes
+      var textBoxContainer = document.createElement("div");
+      textBoxContainer.className = "text-box-container";
+
+      // Add 5 text boxes
+      for (var i = 0; i < 2; i++) {
+        var textBox = document.createElement("input");
+        textBox.type = "text";
+        textBox.placeholder = "Remark " + (i + 1);
+        textBox.className = "text-box"; // Add a class for styling
+        textBoxContainer.appendChild(textBox);
+      }
+
+      // Append the text box container to the coordinate container
+      coordinateContainer.appendChild(textBoxContainer);
+    }
+
+    // Function to update marker position and coordinate container
+    function updateMarkerAndContainer(e) {
+      var coordinates =
+        e.latlng.lat.toFixed(6) + ", " + e.latlng.lng.toFixed(6);
+
+      // Update the content of the coordinate container
+      coordinateContainer.innerHTML = "Coordinates: " + coordinates;
+
+      // Update marker position
+      marker.setLatLng(e.latlng);
+
+      // Bind popup content to marker
+      marker
+        .bindPopup(
+          "You clicked at this point" +
+            "<div><p>Coordinates: " +
+            coordinates +
+            "</p>" +
+            '<button id="copyButton" onclick="copyCoordinates(\'' +
+            coordinates +
+            "')\">Copy</button></div>"
+        )
+        .openPopup();
+
+      // Create and append text box container
+      createTextBoxContainer();
+    }
+
+    // Map click event
+    map.on("click", function (e) {
+      updateMarkerAndContainer(e);
+    });
+  });
+
+  // Function to copy coordinates to clipboard /**************/
+  function copyCoordinates(coordinates) {
+    // Create a temporary input element
+    var tempInput = document.createElement("input");
+    tempInput.value = coordinates;
+    document.body.appendChild(tempInput);
+
+    // Select the text in the input element
+    tempInput.select();
+    tempInput.setSelectionRange(0, 99999); /* For mobile devices */
+
+    // Copy the text to the clipboard
+    document.execCommand("copy");
+
+    // Remove the temporary input element
+    document.body.removeChild(tempInput);
+  }
+
+  // Search bar  /*****/
+  var geocoder = L.Control.Geocoder.nominatim();
+  var control = L.Control.geocoder({
+    geocoder: geocoder,
+  }).addTo(map);
+
+  // adding scale to map
+  L.control.scale().addTo(map);
+
+  // layer control /*******************/
+
+  var baseMaps = {
+    OSM: osm,
+    openstreet: OpenStreetMap_France,
+    googleStreets: googleStreets,
+    googleHybrid: googleHybrid,
+    googleTerrain: googleTerrain,
+    GoogleSatellite: googleSat,
+    OpenTopoMap: OpenTopoMap,
+  };
+  var overlayMaps = {
+    "First Marker": singleMarker,
+    "Second Marker": secondMarker,
+  };
+  map.removeLayer(singleMarker);
+
+  L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map); //layers control option off on hover
+
+  //------------- Function for import the geojson and kml files -----------
+  //                           /*************/
+  (function (window) {
+    "use strict";
+
+    function initMap() {
+      var control;
+      var L = window.L;
+
+      var style = {
+        color: "red",
+        opacity: 8.0,
+        fillOpacity: 0.2,
+        weight: 1,
+        clickable: true,
+      };
+
+      L.Control.FileLayerLoad.LABEL =
+        '<img class="icon" src="./images/download design.png"/>';
+
+      control = L.Control.fileLayerLoad({
+        fitBounds: true,
+        layerOptions: {
+          style: style,
+          pointToLayer: function (data, latlng) {
+            return L.circleMarker(latlng, { style: style });
+          },
+        },
+      });
+      control.addTo(map);
+
+      control.loader.on("data:loaded", function (e) {
+        var layer = e.layer;
+        console.log(layer);
+      });
+    }
+
+    window.addEventListener("load", function () {
+      initMap();
+    });
+  })(window);
+</script>
+<!-- first script end here -->
+
+<!-- files of shape draw include /*********************/-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw-src.css"
+  integrity="sha512-vJfMKRRm4c4UupyPwGUZI8U651mSzbmmPgR3sdE3LcwBPsdGeARvUM5EcSTg34DK8YIRiIo+oJwNfZPMKEQyug=="
+  crossorigin="anonymous"
+  referrerpolicy="no-referrer"
+/>
+
+<!-- script start -->
+<script>
+  var drawnItems = new L.FeatureGroup();
+  map.addLayer(drawnItems);
+  var drawControl = new L.Control.Draw({
+    // position: 'topright',
+    draw: {
+      polygon: {
+        shapeOptions: {
+          color: "purple",
+        },
+        //  allowIntersection: false,
+        //  drawError: {
+        //   color: 'orange',
+        //   timeout: 1000
+        //  },
+      },
+      polyline: {
+        shapeOptions: {
+          color: "red",
+        },
+      },
+      rect: {
+        shapeOptions: {
+          color: "green",
+        },
+      },
+      circle: {
+        shapeOptions: {
+          color: "steelblue",
+        },
+      },
+    },
+    edit: {
+      featureGroup: drawnItems,
+    },
+  });
+  map.addControl(drawControl);
+  //   map.on('draw:created', function (e) {
+  //         var type = e.layerType,
+  //             layer = e.layer,
+  //             Area = e.Area;
+  //         drawnItems.addLayer(layer);
+
+  //         layer.bindPopup(`<p>${JSON.stringify(layer.toGeoJSON())} </p>`)
+  //     });
+
+  map.on("draw:created", function (e) {
+    var layer = e.layer;
+    drawnItems.addLayer(layer);
+
+    var popupContent = "<div>";
+
+    // Calculate and display the area
+    var area = 0;
+    if (layer instanceof L.Circle) {
+      area = Math.PI * Math.pow(layer.getRadius(), 2);
+    } else if (layer instanceof L.Rectangle) {
+      var bounds = layer.getBounds();
+      area =
+        bounds.getNorthEast().distanceTo(bounds.getSouthWest()) *
+        bounds.getNorthEast().distanceTo(bounds.getSouthWest());
+    } else if (layer instanceof L.Polygon) {
+      area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+    }
+    popupContent += `<p>Area: ${area.toFixed(2)} square meters</p>`;
+
+    // Add shape type to popup
+    popupContent += `<p>Shape Type: ${
+      layer instanceof L.Circle
+        ? "Circle"
+        : layer instanceof L.Rectangle
+        ? "Rectangle"
+        : "Polygon"
+    }</p>`;
+
+    // Add coordinates to popup
+    if (layer instanceof L.Circle || layer instanceof L.Rectangle) {
+      var centerCoordinates = layer.getBounds().getCenter();
+      popupContent += `<p>Center Coordinates: ${centerCoordinates.lat.toFixed(
+        6
+      )}, ${centerCoordinates.lng.toFixed(6)}</p>`;
+    } else if (layer instanceof L.Polygon) {
+      var latSum = 0;
+      var lngSum = 0;
+      var latLngs = layer.getLatLngs()[0]; // Assuming a single polygon ring
+
+      // Calculate the sum of latitude and longitude
+      for (var i = 0; i < latLngs.length; i++) {
+        latSum += latLngs[i].lat;
+        lngSum += latLngs[i].lng;
+      }
+
+      // Calculate the centroid
+      var centroid = L.latLng(latSum / latLngs.length, lngSum / latLngs.length);
+      popupContent += `<p>Centroid Coordinates: ${centroid.lat.toFixed(
+        6
+      )}, ${centroid.lng.toFixed(6)}</p>`;
+    }
+
+    popupContent += "</div>";
+
+    // Bind popup to the drawn layer
+    layer.bindPopup(popupContent).openPopup();
+  });
+
+  // Function to edit shape (example)
+  function editShape(layerId) {
+    var layer = drawnItems.getLayer(layerId);
+    if (layer) {
+      layer.enableEdit();
+    }
+  }
+</script>
+
+<!-- script end here -->
